@@ -4,10 +4,15 @@ const myFace = document.getElementById("myFace");
 const muteBtn = document.getElementById("mute");
 const cameraBtn = document.getElementById("camera");
 const cameraSelect = document.getElementById("cameras");
+const call = document.getElementById("call");
+
+call.hidden = true;
 
 let myStream;
 let muted = false;
 let cameraOff = false;
+let roomName;
+let myPeerConnection;
 
 async function getCameras(){
     try {
@@ -50,8 +55,6 @@ async function getMedia(deviceId) {
     }
 }
 
-getMedia();
-
 function handleMuteClick(){
     myStream
         .getAudioTracks()
@@ -85,3 +88,50 @@ async function handleCameraChange(){
 muteBtn.addEventListener("click", handleMuteClick);
 cameraBtn.addEventListener("click", handleCameraClick);
 cameraSelect.addEventListener("input", handleCameraChange);
+
+
+/// Welcome Form (join a room)
+
+const welcome = document.getElementById("welcome");
+const welcomeForm = welcome.querySelector("form");
+
+async function startMedia(){
+    welcome.hidden = true;
+    call.hidden = false;
+    await getMedia();
+    makeConnection();
+}
+
+function handleWelcomeSubmit(event) {
+    event.preventDefault();
+    const input = welcome.querySelector("input");
+    socket.emit("join_roon", input.value, startMedia);
+    roomName = input.value;
+    input.value = "";
+}
+
+welcome.addEventListener("submit", handleWelcomeSubmit);
+
+
+/// Socket Code
+/// peer A, create an Offer and send to peer B
+socket.on("welcome", async () => {
+    const offer = await myPeerConnection.createOffer();
+    myPeerConnection.setLocalDescription(offer)
+    console.log("sent the offer");
+    socket.emit("offer", offer, roomName);
+});
+
+/// peer B
+socket.on("offer", offer => {
+    console.log(offer);
+});
+
+/// RTC Code
+
+function makeConnection(){
+    myPeerConnection = new RTCPeerConnection();
+    myStream
+        .getTracks()
+        .forEach((track) => myPeerConnection.addTrack(track, myStream));
+}
